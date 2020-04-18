@@ -33,7 +33,7 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
     valid_loss_min = float("inf")
     bad_epoch = 0
     for epoch in range(config.epoch):
-        print("Current epoch: ", epoch)
+        print("Epoch {}/{}".format(epoch, config.epoch))
         model.train()
         train_loss_array = []
         for i, _data in enumerate(train_loader):
@@ -58,7 +58,7 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
         else:
             bad_epoch += 1
             if bad_epoch >= config.patience:
-                print(" The training stops early in epoch".format(epoch))
+                print(" The training stops early in epoch {}".format(epoch))
                 break
 
 

@@ -15,12 +15,12 @@ else:
 class Config:
     # 数据参数
     feature_columns = list(range(2, 9))     # 要作为feature的列，按原数据从0开始计算  list(range(2, 9))
-    label_columns = [5]                  # 要预测的列，按原数据从0开始计算, 如同时预测第四，五列 最低价和最高价
+    label_columns = [4, 5]                  # 要预测的列，按原数据从0开始计算, 如同时预测第四，五列 最低价和最高价
     feature_and_label_columns = feature_columns + label_columns
     # label_in_feature_columns = [feature_columns.index(i) for i in label_columns]  # 这样写不行
     label_in_feature_columns = (lambda x,y: [x.index(i) for i in y])(feature_columns, label_columns)
 
-    predict_day = 10  # 预测未来几天的label
+    predict_day = 1  # 预测未来几天
 
 
     # 网络参数
@@ -34,7 +34,7 @@ class Config:
 
     # 训练参数
     do_train = True
-    do_predict = False
+    do_predict = True
     add_train = False           # 是否载入已有模型参数进行增量训练
     shuffle_train_data = True   # 是否对训练数据做shuffle
 
@@ -45,17 +45,22 @@ class Config:
     learning_rate = 0.001
     epoch = 20
     patience = 5                # 训练多少epoch，验证集没提升就停掉
-    random_seed = 42
+    random_seed = 42            # 随机种子，保证可复现
+
 
     # 路径参数
     train_data_path = "./data/stock_data.csv"
     model_save_path = "./checkpoint/"
+    figure_save_path = "./figure/"
     if not os.path.exists(model_save_path):
         os.mkdir(model_save_path)
+    if not os.path.exists(figure_save_path):
+        os.mkdir(figure_save_path)
 
     # 框架参数
+    used_frame = frame
     model_postfix = {"pytorch": ".pth", "keras": ".h5", "tensorflow": ".ckpt"}
-    model_name = "model_" + frame + model_postfix[frame]
+    model_name = "model_" + used_frame + model_postfix[used_frame]
 
 
 class Data:
@@ -122,11 +127,13 @@ def draw(config: Config, origin_data: Data, predict_data: np.ndarray):
         plt.legend(loc='upper right')
         plt.xlabel("Day")
         plt.ylabel(label_name[i])
+        plt.savefig(config.figure_save_path+"predict_{}_with_{}.png".format(label_name[i], config.used_frame))
     plt.show()
 
 
 def main():
     config = Config()
+    np.random.seed(config.random_seed)
     data_gainer = Data(config)
 
     if config.do_train:

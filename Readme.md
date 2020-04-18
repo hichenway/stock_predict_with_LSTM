@@ -18,6 +18,6 @@ Chinese introduction can refer to : <https://blog.csdn.net/songyunli1111/article
 
 The simultaneous predict results for stock high and low price with pytorch show as follow:
 
-![](./figure/predict_high_with_pytorch.png)
+![predict_high_with_pytorch](https://github.com/hichenway/stock_predict_with_LSTM/blob/master/figure/predict_high_with_pytorch.png)
 
-![](./figure/predict_low_with_pytorch.png)
+![predict_low_with_pytorch](https://github.com/hichenway/stock_predict_with_LSTM/blob/master/figure/predict_low_with_pytorch.png)

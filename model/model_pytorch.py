@@ -12,10 +12,11 @@ class Net(Module):
                          num_layers=config.lstm_layers, batch_first=True, dropout=config.dropout_rate)
         self.linear = Linear(in_features=config.hidden_size, out_features=config.output_size)
 
-    def forward(self, x):
-        lstm_out, _ = self.lstm(x)     # LSTM 的返回很多
+    def forward(self, x, hidden=None):
+        lstm_out, hidden = self.lstm(x, hidden)     # LSTM 的返回很多
         linear_out = self.linear(lstm_out)
-        return linear_out
+        return linear_out, hidden
+
 
 def train(config, train_X, train_Y, valid_X, valid_Y):
     train_X, train_Y = torch.from_numpy(train_X).float(), torch.from_numpy(train_Y).float()
@@ -36,18 +37,34 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
         print("Epoch {}/{}".format(epoch, config.epoch))
         model.train()
         train_loss_array = []
+        hidden_train = None
         for i, _data in enumerate(train_loader):
-            data_X, data_Y = _data
+            _train_X, _train_Y = _data
             optimizer.zero_grad()
-            pred_X = model(data_X)
-            loss = criterion(pred_X, data_Y)
+            pred_Y, hidden_train = model(_train_X, hidden_train)
+
+            if not config.do_continue_train:
+                hidden_train = None         # 如果非连续训练，把hidden重置即可
+            else:
+                h_0, c_0 = hidden_train
+                h_0.detach_(), c_0.detach_()    # 去掉梯度信息
+                hidden_train = (h_0, c_0)
+            loss = criterion(pred_Y, _train_Y)
             loss.backward()
             optimizer.step()
             train_loss_array.append(loss.item())
 
         # 以下为早停机制
         model.eval()
-        valid_loss_cur = np.mean([criterion(model(_X), _Y).item() for _X, _Y in valid_loader])
+        valid_loss_array = []
+        hidden_valid = None
+        for _valid_X, _valid_Y in valid_loader:
+            pred_Y, hidden_valid = model(_valid_X, hidden_valid)
+            if not config.do_continue_train: hidden_valid = None
+            loss = criterion(pred_Y, _valid_Y)
+            valid_loss_array.append(loss.item())
+
+        valid_loss_cur = np.mean(valid_loss_array)
         print("The train loss is {:.4f}. ".format(np.mean(train_loss_array)),
               "The valid loss is {:.4f}.".format(valid_loss_cur))
 
@@ -74,9 +91,11 @@ def predict(config, test_X):
     result = torch.Tensor()
 
     model.eval()
+    hidden_predict = None
     for _data in test_loader:
         data_X = _data[0]
-        pred_X = model(data_X)
+        pred_X, hidden_predict = model(data_X, hidden_predict)
+        # if not config.do_continue_train: hidden_predict = None    # 实验发现无论是否是连续训练模式，把上一个time_step的hidden传入下一个效果都更好
         cur_pred = torch.squeeze(pred_X, dim=0)
         result = torch.cat((result, cur_pred), dim=0)
 

@@ -47,11 +47,18 @@ class Config:
     patience = 5                # 训练多少epoch，验证集没提升就停掉
     random_seed = 42            # 随机种子，保证可复现
 
+    do_continue_train = False    # 每次训练把上一次的final_state作为下一次的init_state，仅用于RNN类型模型，目前仅支持pytorch
+    continue_flag = ""           # 但实际效果不佳，可能原因：仅能以 batch_size = 1 训练
+    if do_continue_train:
+        shuffle_train_data = False
+        batch_size = 1
+        continue_flag = "continue_"
 
     # 路径参数
     train_data_path = "./data/stock_data.csv"
     model_save_path = "./checkpoint/"
     figure_save_path = "./figure/"
+    do_figure_save = False
     if not os.path.exists(model_save_path):
         os.mkdir(model_save_path)
     if not os.path.exists(figure_save_path):
@@ -60,7 +67,7 @@ class Config:
     # 框架参数
     used_frame = frame
     model_postfix = {"pytorch": ".pth", "keras": ".h5", "tensorflow": ".ckpt"}
-    model_name = "model_" + used_frame + model_postfix[used_frame]
+    model_name = "model_" + continue_flag + used_frame + model_postfix[used_frame]
 
 
 class Data:
@@ -86,9 +93,17 @@ class Data:
         feature_data = self.norm_data[:self.train_num]
         label_data = self.norm_data[self.config.predict_day : self.config.predict_day + self.train_num,
                                     self.config.label_in_feature_columns]    # 将延后几天的数据作为label
+        if not self.config.do_continue_train:
+            train_x = [feature_data[i:i+self.config.time_step] for i in range(self.train_num-self.config.time_step)]
+            train_y = [label_data[i:i+self.config.time_step] for i in range(self.train_num-self.config.time_step)]
+        else:
+            train_x = [feature_data[start_index + i*self.config.time_step : start_index + (i+1)*self.config.time_step]
+                       for start_index in range(self.config.time_step)
+                       for i in range((self.train_num - start_index) // self.config.time_step)]
+            train_y = [label_data[start_index + i*self.config.time_step : start_index + (i+1)*self.config.time_step]
+                       for start_index in range(self.config.time_step)
+                       for i in range((self.train_num - start_index) // self.config.time_step)]
 
-        train_x = [feature_data[i:i+self.config.time_step] for i in range(self.train_num-self.config.time_step)]
-        train_y = [label_data[i:i+self.config.time_step] for i in range(self.train_num-self.config.time_step)]
         train_x, train_y = np.array(train_x), np.array(train_y)
 
         train_x, valid_x, train_y, valid_y = train_test_split(train_x, train_y, test_size=self.config.valid_data_rate,
@@ -96,28 +111,38 @@ class Data:
                                                               shuffle=self.config.shuffle_train_data)
         return train_x, valid_x, train_y, valid_y
 
-    def get_test_data(self):
+    def get_test_data(self, return_label_data=False):
         feature_data = self.norm_data[self.train_num:]
         self.start_num_in_test = feature_data.shape[0] % self.config.time_step
         time_step_size = feature_data.shape[0] // self.config.time_step
 
         test_x = [feature_data[self.start_num_in_test+i*self.config.time_step : self.start_num_in_test+(i+1)*self.config.time_step]
                    for i in range(time_step_size)]
+        if return_label_data:
+            label_data = self.norm_data[self.train_num + self.start_num_in_test:, self.config.label_in_feature_columns]
+            return np.array(test_x), label_data
         return np.array(test_x)
 
 
-def draw(config: Config, origin_data: Data, predict_data: np.ndarray):
-    label_data = origin_data.data[origin_data.train_num + origin_data.start_num_in_test : ,
+def draw(config: Config, origin_data: Data, predict_norm_data: np.ndarray):
+    label_norm_data = origin_data.norm_data[origin_data.train_num + origin_data.start_num_in_test : ,
                                     config.label_in_feature_columns]
-    assert label_data.shape[0]==predict_data.shape[0], "The element number in origin and predicted data is different"
+    assert label_norm_data.shape[0]==predict_norm_data.shape[0], "The element number in origin and predicted data is different"
 
     label_name = [origin_data.data_column_name[i] for i in config.label_in_feature_columns]
     label_column_num = len(config.label_columns)
 
+    # label 和 predict 是错开config.predict_day天的数据的
+    loss = np.mean((label_norm_data[config.predict_day:] - predict_norm_data[:-config.predict_day] ) ** 2, axis=0)
+    print("The mean squared error of stock {} is ".format(label_name), loss)
+
     label_X = range(origin_data.data_num - origin_data.train_num - origin_data.start_num_in_test)
     predict_X = [ x + config.predict_day for x in label_X]
 
-    predict_data = predict_data * origin_data.std[config.label_in_feature_columns] + \
+    label_data = label_norm_data * origin_data.std[config.label_in_feature_columns] + \
+                   origin_data.mean[config.label_in_feature_columns]
+
+    predict_data = predict_norm_data * origin_data.std[config.label_in_feature_columns] + \
                    origin_data.mean[config.label_in_feature_columns]
 
     for i in range(label_column_num):
@@ -126,8 +151,13 @@ def draw(config: Config, origin_data: Data, predict_data: np.ndarray):
         plt.plot(predict_X, predict_data[:, i], label='predict')
         plt.legend(loc='upper right')
         plt.xlabel("Day")
-        plt.ylabel(label_name[i])
-        plt.savefig(config.figure_save_path+"predict_{}_with_{}.png".format(label_name[i], config.used_frame))
+        plt.ylabel("Price")
+        plt.title("Predict stock {} price with {}".format(label_name[i], config.used_frame))
+        print("The predicted stock {} for the next {} day(s) is: ".format(label_name[i], config.predict_day),
+              np.squeeze(predict_data[-config.predict_day:, i]))
+        if config.do_figure_save:
+            plt.savefig(config.figure_save_path+"{}predict_{}_with_{}.png".format(config.continue_flag, label_name[i], config.used_frame))
+
     plt.show()
 
 
@@ -141,9 +171,10 @@ def main():
         train(config, train_X, train_Y, valid_X, valid_Y)
 
     if config.do_predict:
-        test_X = data_gainer.get_test_data()
+        test_X, test_Y = data_gainer.get_test_data(return_label_data=True)
         pred_result = predict(config, test_X)
         draw(config, data_gainer, pred_result)
+
 
 if __name__=="__main__":
     main()

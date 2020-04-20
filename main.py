@@ -33,7 +33,7 @@ class Config:
     time_step = 20
 
     # 训练参数
-    do_train = True
+    do_train = False
     do_predict = True
     add_train = False           # 是否载入已有模型参数进行增量训练
     shuffle_train_data = True   # 是否对训练数据做shuffle
@@ -161,8 +161,7 @@ def draw(config: Config, origin_data: Data, predict_norm_data: np.ndarray):
     plt.show()
 
 
-def main():
-    config = Config()
+def main(config):
     np.random.seed(config.random_seed)
     data_gainer = Data(config)
 
@@ -177,4 +176,18 @@ def main():
 
 
 if __name__=="__main__":
-    main()
+    import argparse
+    # 便于命令行下的运行，可以根据需要增加更多
+    parser = argparse.ArgumentParser()
+    # parser.add_argument("-t", "--do_train", default=False, type=bool, help="whether to train")
+    # parser.add_argument("-p", "--do_predict", default=True, type=bool, help="whether to train")
+    # parser.add_argument("-b", "--batch_size", default=64, type=int, help="batch size")
+    # parser.add_argument("-e", "--epoch", default=20, type=int, help="epochs num")
+    args = parser.parse_args()
+
+    con = Config()
+    for key in dir(args):
+        if not key.startswith("_"):
+            setattr(con, key, getattr(args, key))
+
+    main(con)

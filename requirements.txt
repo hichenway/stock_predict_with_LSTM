@@ -1,0 +1,9 @@
+sklearn
+pandas
+argparse
+keras==2.2.4
+tensorflow==1.14.0
+matplotlib>=3.0.2
+numpy>=1.14.6
+scipy>=1.1.0
+torch>=1.1.0

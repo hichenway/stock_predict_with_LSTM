@@ -1,4 +1,5 @@
 # keras 模型
+# Author: hichenway
 from keras.layers import Input, Dense, LSTM
 from keras.models import Model
 from keras.callbacks import ModelCheckpoint, EarlyStopping

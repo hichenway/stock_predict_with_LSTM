@@ -1,16 +1,19 @@
+# Author: hichenway
 import pandas as pd
 import numpy as np
 import os
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
-frame = "pytorch"  # 可选： "keras",  "pytorch"
+frame = "pytorch"  # 可选： "keras", "pytorch", "tensorflow"
 if frame == "pytorch":
     from model.model_pytorch import train, predict
 elif frame == "keras":
     from model.model_keras import train, predict
+elif frame == "tensorflow":
+    from model.model_tensorflow import train, predict
 else:
-    raise Exception("TensorFlow code is in origin_tf_code")
+    raise Exception("Wrong frame seletion")
 
 class Config:
     # 数据参数

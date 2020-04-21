@@ -1,9 +1,9 @@
-import numpy as np
-
 # pytorch 模型
+# Author: hichenway
 import torch
 from torch.nn import Module, LSTM, Linear
 from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
 
 class Net(Module):
     def __init__(self, config):

@@ -21,7 +21,7 @@ class Model:
 
         def dropout_cell():
             basicLstm = tf.nn.rnn_cell.LSTMCell(self.config.hidden_size)
-            dropoutLstm = tf.nn.rnn_cell.DropoutWrapper(basicLstm, output_keep_prob=self.config.dropout_rate)
+            dropoutLstm = tf.nn.rnn_cell.DropoutWrapper(basicLstm, output_keep_prob=1-self.config.dropout_rate)
             return dropoutLstm
 
         cell = tf.nn.rnn_cell.MultiRNNCell([dropout_cell() for _ in range(self.config.lstm_layers)])

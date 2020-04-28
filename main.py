@@ -36,7 +36,7 @@ class Config:
     time_step = 20
 
     # 训练参数
-    do_train = False
+    do_train = True
     do_predict = True
     add_train = False           # 是否载入已有模型参数进行增量训练
     shuffle_train_data = True   # 是否对训练数据做shuffle

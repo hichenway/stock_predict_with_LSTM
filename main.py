@@ -10,7 +10,6 @@ from log.log_decorator import log
 
 frame = "pytorch"  # 可选： "keras", "pytorch", "tensorflow"
 if frame == "pytorch":
-    import torch
     from model.model_pytorch import train, predict
 elif frame == "keras":
     from model.model_keras import train, predict

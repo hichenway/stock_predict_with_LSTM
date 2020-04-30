@@ -44,9 +44,14 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
 
     train_len = len(train_X)
     valid_len = len(valid_X)
-    sess_config = tf.ConfigProto(log_device_placement=True, allow_soft_placement=True) #在CUDA可用时会自动选择GPU，否则CPU
-    sess_config.gpu_options.per_process_gpu_memory_fraction = 0.7  # 显存占用率
-    sess_config.gpu_options.allow_growth=True   #初始化时不全部占满GPU显存, 按需分配
+
+    if config.use_cuda:
+        sess_config = tf.ConfigProto(log_device_placement=True, allow_soft_placement=True) #在CUDA可用时会自动选择GPU，否则CPU
+        sess_config.gpu_options.per_process_gpu_memory_fraction = 0.7  # 显存占用率
+        sess_config.gpu_options.allow_growth=True   #初始化时不全部占满GPU显存, 按需分配
+    else:
+        sess_config = None
+
     with tf.Session(config=sess_config) as sess:
         sess.run(tf.global_variables_initializer())
 

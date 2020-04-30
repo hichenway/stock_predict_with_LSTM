@@ -5,6 +5,8 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
+from log.log_decorator import log
+
 frame = "pytorch"  # 可选： "keras", "pytorch", "tensorflow"
 if frame == "pytorch":
     from model.model_pytorch import train, predict
@@ -36,7 +38,7 @@ class Config:
     time_step = 20
 
     # 训练参数
-    do_train = True
+    do_train = False
     do_predict = True
     add_train = False           # 是否载入已有模型参数进行增量训练
     shuffle_train_data = True   # 是否对训练数据做shuffle
@@ -163,7 +165,8 @@ def draw(config: Config, origin_data: Data, predict_norm_data: np.ndarray):
 
     plt.show()
 
-
+@log()      # 日志记录装饰器
+# @log(filename="./log/out.log", to_file=True)      # 如果要记录到文件用这个
 def main(config):
     np.random.seed(config.random_seed)
     data_gainer = Data(config)

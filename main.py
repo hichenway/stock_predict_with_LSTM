@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import os
+import sys
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
@@ -9,6 +10,7 @@ from log.log_decorator import log
 
 frame = "pytorch"  # 可选： "keras", "pytorch", "tensorflow"
 if frame == "pytorch":
+    import torch
     from model.model_pytorch import train, predict
 elif frame == "keras":
     from model.model_keras import train, predict
@@ -38,10 +40,11 @@ class Config:
     time_step = 20
 
     # 训练参数
-    do_train = False
+    do_train = True
     do_predict = True
     add_train = False           # 是否载入已有模型参数进行增量训练
     shuffle_train_data = True   # 是否对训练数据做shuffle
+    use_cuda = False            # 是否使用GPU训练
 
     train_data_rate = 0.95      # 训练数据占总体数据比例
     valid_data_rate = 0.15      # 验证数据占训练数据比例
@@ -93,6 +96,9 @@ class Data:
         init_data = pd.read_csv(self.config.train_data_path,
                            usecols=self.config.feature_and_label_columns)
         return init_data.values, init_data.columns.tolist()
+
+    def get_train_and_valid_data(self):
+        feature_data = self.norm_data[:self.train_num]
 
     def get_train_and_valid_data(self):
         feature_data = self.norm_data[:self.train_num]
@@ -149,21 +155,18 @@ def draw(config: Config, origin_data: Data, predict_norm_data: np.ndarray):
 
     predict_data = predict_norm_data * origin_data.std[config.label_in_feature_columns] + \
                    origin_data.mean[config.label_in_feature_columns]
+    if not sys.platform.startswith('linux'):  # 无桌面的Linux下无法输出，如果有桌面的Linux，如Ubuntu，可去掉这一行
+        for i in range(label_column_num):
+            plt.figure(i+1)
+            plt.plot(label_X, label_data[:, i], label='label')
+            plt.plot(predict_X, predict_data[:, i], label='predict')
+            plt.title("Predict stock {} price with {}".format(label_name[i], config.used_frame))
+            print("The predicted stock {} for the next {} day(s) is: ".format(label_name[i], config.predict_day),
+                  np.squeeze(predict_data[-config.predict_day:, i]))
+            if config.do_figure_save:
+                plt.savefig(config.figure_save_path+"{}predict_{}_with_{}.png".format(config.continue_flag, label_name[i], config.used_frame))
 
-    for i in range(label_column_num):
-        plt.figure(i+1)
-        plt.plot(label_X, label_data[:, i], label='label')
-        plt.plot(predict_X, predict_data[:, i], label='predict')
-        plt.legend(loc='upper right')
-        plt.xlabel("Day")
-        plt.ylabel("Price")
-        plt.title("Predict stock {} price with {}".format(label_name[i], config.used_frame))
-        print("The predicted stock {} for the next {} day(s) is: ".format(label_name[i], config.predict_day),
-              np.squeeze(predict_data[-config.predict_day:, i]))
-        if config.do_figure_save:
-            plt.savefig(config.figure_save_path+"{}predict_{}_with_{}.png".format(config.continue_flag, label_name[i], config.used_frame))
-
-    plt.show()
+        plt.show()
 
 @log()      # 日志记录装饰器
 # @log(filename="./log/out.log", to_file=True)      # 如果要记录到文件用这个

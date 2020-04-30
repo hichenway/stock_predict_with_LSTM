@@ -14,7 +14,18 @@ def get_keras_model(config):
     model.compile(loss='mse', optimizer='adam')     # metrics=["mae"]
     return model
 
+def gpu_train_init():
+    import tensorflow as tf
+    from keras.backend.tensorflow_backend import set_session
+
+    sess_config = tf.ConfigProto(log_device_placement=True, allow_soft_placement=True)
+    sess_config.gpu_options.per_process_gpu_memory_fraction = 0.7 #最多使用70%GPU内存
+    sess_config.gpu_options.allow_growth=True   #初始化时不全部占满GPU显存, 按需分配 
+    sess = tf.Session(config = sess_config)
+    set_session(sess)
+
 def train(config, train_X, train_Y, valid_X, valid_Y):
+    if config.use_cuda: gpu_train_init()
     model = get_keras_model(config)
     model.summary()
     if config.add_train:

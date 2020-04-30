@@ -44,7 +44,10 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
 
     train_len = len(train_X)
     valid_len = len(valid_X)
-    with tf.Session() as sess:
+    sess_config = tf.ConfigProto(log_device_placement=True, allow_soft_placement=True) #在CUDA可用时会自动选择GPU，否则CPU
+    sess_config.gpu_options.per_process_gpu_memory_fraction = 0.7  # 显存占用率
+    sess_config.gpu_options.allow_growth=True   #初始化时不全部占满GPU显存, 按需分配
+    with tf.Session(config=sess_config) as sess:
         sess.run(tf.global_variables_initializer())
 
         valid_loss_min = float("inf")
@@ -84,7 +87,7 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
 
 
 def predict(config, test_X):
-    config.dropout_rate = 1     # 预测模式要调为1
+    config.dropout_rate = 0     # 预测模式要调为1
 
     with tf.variable_scope("stock_predict", reuse=tf.AUTO_REUSE):
         model = Model(config)

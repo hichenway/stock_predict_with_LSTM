@@ -25,7 +25,8 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
     valid_X, valid_Y = torch.from_numpy(valid_X).float(), torch.from_numpy(valid_Y).float()
     valid_loader = DataLoader(TensorDataset(valid_X, valid_Y), batch_size=config.batch_size)
 
-    model = Net(config)
+    device = torch.device("cuda:0" if config.use_cuda and torch.cuda.is_available() else "cpu")
+    model = Net(config).to(device)
     if config.add_train:
         model.load_state_dict(torch.load(config.model_save_path + config.model_name))
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
@@ -39,7 +40,7 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
         train_loss_array = []
         hidden_train = None
         for i, _data in enumerate(train_loader):
-            _train_X, _train_Y = _data
+            _train_X, _train_Y = _data[0].to(device),_data[1].to(device)
             optimizer.zero_grad()
             pred_Y, hidden_train = model(_train_X, hidden_train)
 
@@ -59,6 +60,7 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
         valid_loss_array = []
         hidden_valid = None
         for _valid_X, _valid_Y in valid_loader:
+            _valid_X, _valid_Y = _valid_X.to(device), _valid_Y.to(device)
             pred_Y, hidden_valid = model(_valid_X, hidden_valid)
             if not config.do_continue_train: hidden_valid = None
             loss = criterion(pred_Y, _valid_Y)
@@ -85,18 +87,19 @@ def predict(config, test_X):
     test_set = TensorDataset(test_X)
     test_loader = DataLoader(test_set, batch_size=1)
 
-    model = Net(config)
+    device = torch.device("cuda:0" if config.use_cuda and torch.cuda.is_available() else "cpu")
+    model = Net(config).to(device)
     model.load_state_dict(torch.load(config.model_save_path + config.model_name))
 
-    result = torch.Tensor()
+    result = torch.Tensor().to(device)
 
     model.eval()
     hidden_predict = None
     for _data in test_loader:
-        data_X = _data[0]
+        data_X = _data[0].to(device)
         pred_X, hidden_predict = model(data_X, hidden_predict)
         # if not config.do_continue_train: hidden_predict = None    # 实验发现无论是否是连续训练模式，把上一个time_step的hidden传入下一个效果都更好
         cur_pred = torch.squeeze(pred_X, dim=0)
         result = torch.cat((result, cur_pred), dim=0)
 
-    return result.detach().numpy()
+    return result.detach().cpu().numpy()

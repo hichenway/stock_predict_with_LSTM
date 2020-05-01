@@ -45,7 +45,7 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
     train_len = len(train_X)
     valid_len = len(valid_X)
 
-    if config.use_cuda:
+    if config.use_cuda:     # 开启GPU训练会有很多警告，但不影响训练
         sess_config = tf.ConfigProto(log_device_placement=True, allow_soft_placement=True) #在CUDA可用时会自动选择GPU，否则CPU
         sess_config.gpu_options.per_process_gpu_memory_fraction = 0.7  # 显存占用率
         sess_config.gpu_options.allow_growth=True   #初始化时不全部占满GPU显存, 按需分配
@@ -94,6 +94,7 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
 def predict(config, test_X):
     config.dropout_rate = 0     # 预测模式要调为1
 
+    tf.reset_default_graph()    # # 清除默认图的堆栈，并设置全局图为默认图
     with tf.variable_scope("stock_predict", reuse=tf.AUTO_REUSE):
         model = Model(config)
 

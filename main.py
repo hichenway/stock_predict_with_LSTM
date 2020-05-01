@@ -98,9 +98,6 @@ class Data:
 
     def get_train_and_valid_data(self):
         feature_data = self.norm_data[:self.train_num]
-
-    def get_train_and_valid_data(self):
-        feature_data = self.norm_data[:self.train_num]
         label_data = self.norm_data[self.config.predict_day : self.config.predict_day + self.train_num,
                                     self.config.label_in_feature_columns]    # 将延后几天的数据作为label
         if not self.config.do_continue_train:

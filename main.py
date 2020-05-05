@@ -3,18 +3,20 @@ import pandas as pd
 import numpy as np
 import os
 import sys
+import time
+import logging
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-
-from log.log_decorator import log
 
 frame = "pytorch"  # 可选： "keras", "pytorch", "tensorflow"
 if frame == "pytorch":
     from model.model_pytorch import train, predict
 elif frame == "keras":
     from model.model_keras import train, predict
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = '3'
 elif frame == "tensorflow":
     from model.model_tensorflow import train, predict
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = '3'    # tf和keras下会有很多tf的warning，但不影响训练
 else:
     raise Exception("Wrong frame seletion")
 
@@ -26,7 +28,6 @@ class Config:
     label_in_feature_index = (lambda x,y: [x.index(i) for i in y])(feature_columns, label_columns)  # 因为feature不一定从0开始
 
     predict_day = 1             # 预测未来几天
-
 
     # 网络参数
     input_size = len(feature_columns)
@@ -60,20 +61,31 @@ class Config:
         batch_size = 1
         continue_flag = "continue_"
 
-    # 路径参数
-    train_data_path = "./data/stock_data.csv"
-    model_save_path = "./checkpoint/"
-    figure_save_path = "./figure/"
-    do_figure_save = False
-    if not os.path.exists(model_save_path):
-        os.mkdir(model_save_path)
-    if not os.path.exists(figure_save_path):
-        os.mkdir(figure_save_path)
+    # 训练模式
+    debug_mode = False  # 调试模式下，是为了跑通代码，追求快
+    debug_num = 500  # 仅用debug_num条数据来调试
 
     # 框架参数
-    used_frame = frame      # 选择的深度学习框架，不同的框架模型保存后缀不一样
+    used_frame = frame  # 选择的深度学习框架，不同的框架模型保存后缀不一样
     model_postfix = {"pytorch": ".pth", "keras": ".h5", "tensorflow": ".ckpt"}
     model_name = "model_" + continue_flag + used_frame + model_postfix[used_frame]
+
+    # 路径参数
+    train_data_path = "./data/stock_data.csv"
+    model_save_path = "./checkpoint/" + used_frame + "/"
+    figure_save_path = "./figure/"
+    log_save_path = "./log/"
+    do_log_save = True                  # 是否将config和训练过程记录到log
+    do_figure_save = False
+    do_train_visualized = False          # 训练loss可视化，pytorch用visdom，tf用tensorboardX，实际上可以通用, keras没有
+    if not os.path.exists(model_save_path):
+        os.makedirs(model_save_path)    # makedirs 递归创建目录
+    if not os.path.exists(figure_save_path):
+        os.mkdir(figure_save_path)
+    if do_train and (do_log_save or do_train_visualized):
+        cur_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())
+        log_save_path = log_save_path + cur_time + '_' + used_frame + "/"
+        os.makedirs(log_save_path)
 
 
 class Data:
@@ -91,8 +103,11 @@ class Data:
         self.start_num_in_test = 0      # 测试集中前几天的数据会被删掉，因为它不够一个time_step
 
     def read_data(self):                # 读取初始数据
-        init_data = pd.read_csv(self.config.train_data_path,
-                                usecols=self.config.feature_columns)
+        if self.config.debug_mode:
+            init_data = pd.read_csv(self.config.train_data_path, nrows=self.config.debug_num,
+                                    usecols=self.config.feature_columns)
+        else:
+            init_data = pd.read_csv(self.config.train_data_path, usecols=self.config.feature_columns)
         return init_data.values, init_data.columns.tolist()     # .columns.tolist() 是获取列名
 
     def get_train_and_valid_data(self):
@@ -137,8 +152,39 @@ class Data:
             return np.array(test_x), label_data
         return np.array(test_x)
 
+def load_logger(config):
+    logger = logging.getLogger()
+    logger.setLevel(level=logging.DEBUG)
 
-def draw(config: Config, origin_data: Data, predict_norm_data: np.ndarray):
+    # StreamHandler
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(level=logging.INFO)
+    formatter = logging.Formatter(datefmt='%Y/%m/%d %H:%M:%S',
+                                  fmt='[ %(asctime)s ] %(message)s')
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    # FileHandler
+    if config.do_log_save:
+        file_handler = logging.FileHandler(config.log_save_path + "out.log")
+        file_handler.setLevel(level=logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        # 把config信息也记录到log 文件中
+        config_dict = {}
+        for key in dir(config):
+            if not key.startswith("_"):
+                config_dict[key] = getattr(config, key)
+        config_str = str(config_dict)
+        config_list = config_str[1:-1].split(", '")
+        config_save_str = "\nConfig:\n" + "\n'".join(config_list)
+        logger.info(config_save_str)
+
+    return logger
+
+def draw(config: Config, origin_data: Data, logger, predict_norm_data: np.ndarray):
     label_norm_data = origin_data.norm_data[origin_data.train_num + origin_data.start_num_in_test : ,
                                             config.label_in_feature_index]
     assert label_norm_data.shape[0]==predict_norm_data.shape[0], "The element number in origin and predicted data is different"
@@ -148,7 +194,7 @@ def draw(config: Config, origin_data: Data, predict_norm_data: np.ndarray):
 
     # label 和 predict 是错开config.predict_day天的数据的
     loss = np.mean((label_norm_data[config.predict_day:] - predict_norm_data[:-config.predict_day] ) ** 2, axis=0)
-    print("The mean squared error of stock {} is ".format(label_name), loss)
+    logger.info("The mean squared error of stock {} is ".format(label_name) + str(loss))
 
     label_X = range(origin_data.data_num - origin_data.train_num - origin_data.start_num_in_test)
     predict_X = [ x + config.predict_day for x in label_X]
@@ -166,27 +212,29 @@ def draw(config: Config, origin_data: Data, predict_norm_data: np.ndarray):
             plt.plot(label_X, label_data[:, i], label='label')
             plt.plot(predict_X, predict_data[:, i], label='predict')
             plt.title("Predict stock {} price with {}".format(label_name[i], config.used_frame))
-            print("The predicted stock {} for the next {} day(s) is: ".format(label_name[i], config.predict_day),
-                  np.squeeze(predict_data[-config.predict_day:, i]))
+            logger.info("The predicted stock {} for the next {} day(s) is: ".format(label_name[i], config.predict_day) +
+                  str(np.squeeze(predict_data[-config.predict_day:, i])))
             if config.do_figure_save:
                 plt.savefig(config.figure_save_path+"{}predict_{}_with_{}.png".format(config.continue_flag, label_name[i], config.used_frame))
 
         plt.show()
 
-@log()      # 日志记录装饰器，可以不用改源代码就增加想要的功能
-# @log(filename="./log/out.log", to_file=True)      # 如果要记录到文件用这个
 def main(config):
-    np.random.seed(config.random_seed)              # 设置随机种子，保证可复现
-    data_gainer = Data(config)
+    logger = load_logger(config)
+    try:
+        np.random.seed(config.random_seed)  # 设置随机种子，保证可复现
+        data_gainer = Data(config)
 
-    if config.do_train:
-        train_X, valid_X, train_Y, valid_Y = data_gainer.get_train_and_valid_data()
-        train(config, train_X, train_Y, valid_X, valid_Y)
+        if config.do_train:
+            train_X, valid_X, train_Y, valid_Y = data_gainer.get_train_and_valid_data()
+            train(config, logger, [train_X, train_Y, valid_X, valid_Y])
 
-    if config.do_predict:
-        test_X, test_Y = data_gainer.get_test_data(return_label_data=True)
-        pred_result = predict(config, test_X)       # 这里输出的是未还原的归一化预测数据
-        draw(config, data_gainer, pred_result)
+        if config.do_predict:
+            test_X, test_Y = data_gainer.get_test_data(return_label_data=True)
+            pred_result = predict(config, test_X)       # 这里输出的是未还原的归一化预测数据
+            draw(config, data_gainer, logger, pred_result)
+    except Exception:
+        logger.error("Run Error", exc_info=True)
 
 
 if __name__=="__main__":

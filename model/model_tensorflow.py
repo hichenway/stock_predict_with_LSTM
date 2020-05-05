@@ -2,6 +2,7 @@
 # Author: hichenway
 import tensorflow as tf
 import numpy as np
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 class Model:
     def __init__(self, config):
@@ -38,10 +39,16 @@ class Model:
         self.saver = tf.train.Saver(tf.global_variables())
 
 
-def train(config, train_X, train_Y, valid_X, valid_Y):
+def train(config, logger, train_and_valid_data):
+    if config.do_train_visualized:  # loss可视化
+        from tensorboardX import SummaryWriter
+        train_writer = SummaryWriter(config.log_save_path + "Train")
+        eval_writer = SummaryWriter(config.log_save_path + "Eval")
+
     with tf.variable_scope("stock_predict"):
         model = Model(config)
 
+    train_X, train_Y, valid_X, valid_Y = train_and_valid_data
     train_len = len(train_X)
     valid_len = len(valid_X)
 
@@ -57,8 +64,9 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
 
         valid_loss_min = float("inf")
         bad_epoch = 0
+        global_step = 0
         for epoch in range(config.epoch):
-            print("Epoch {}/{}".format(epoch, config.epoch))
+            logger.info("Epoch {}/{}".format(epoch, config.epoch))
             # 训练
             train_loss_array = []
             for step in range(train_len//config.batch_size):
@@ -66,6 +74,9 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
                              model.Y: train_Y[step*config.batch_size : (step+1)*config.batch_size]}
                 train_loss, _ = sess.run([model.loss,model.optim], feed_dict=feed_dict)
                 train_loss_array.append(train_loss)
+                if config.do_train_visualized and global_step % 100 == 0:   # 每一百步显示一次
+                    train_writer.add_scalar('Train_Loss', train_loss, global_step+1)
+                global_step += 1
 
             # 验证与早停
             valid_loss_array = []
@@ -75,19 +86,22 @@ def train(config, train_X, train_Y, valid_X, valid_Y):
                 valid_loss = sess.run(model.loss, feed_dict=feed_dict)
                 valid_loss_array.append(valid_loss)
 
+            train_loss_cur = np.mean(train_loss_array)
             valid_loss_cur = np.mean(valid_loss_array)
-            print("The train loss is {:.4f}. ".format(np.mean(train_loss_array)),
-                  "The valid loss is {:.4f}.".format(valid_loss_cur))
+            logger.info("The train loss is {:.6f}. ".format(train_loss_cur) +
+                        "The valid loss is {:.6f}.".format(valid_loss_cur))
+            if config.do_train_visualized:
+                train_writer.add_scalar('Epoch_Loss', train_loss_cur, epoch + 1)
+                eval_writer.add_scalar('Epoch_Loss', valid_loss_cur, epoch + 1)
 
             if valid_loss_cur < valid_loss_min:
                 valid_loss_min = valid_loss_cur
                 bad_epoch = 0
-                path = model.saver.save(sess, config.model_save_path + config.model_name)
-                print(path)
+                model.saver.save(sess, config.model_save_path + config.model_name)
             else:
                 bad_epoch += 1
                 if bad_epoch >= config.patience:
-                    print(" The training stops early in epoch {}".format(epoch))
+                    logger.info(" The training stops early in epoch {}".format(epoch))
                     break
 
 

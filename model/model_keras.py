@@ -24,8 +24,9 @@ def gpu_train_init():
     sess = tf.Session(config = sess_config)
     set_session(sess)
 
-def train(config, train_X, train_Y, valid_X, valid_Y):
+def train(config, logger, train_and_valid_data):
     if config.use_cuda: gpu_train_init()
+    train_X, train_Y, valid_X, valid_Y = train_and_valid_data
     model = get_keras_model(config)
     model.summary()
     if config.add_train:

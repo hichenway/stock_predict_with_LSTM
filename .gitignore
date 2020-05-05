@@ -3,4 +3,5 @@
 /checkpoint
 *.log
 *.swp
+/log
 

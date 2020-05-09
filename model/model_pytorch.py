@@ -1,5 +1,12 @@
-# pytorch 模型
-# Author: hichenway
+# -*- coding: UTF-8 -*-
+"""
+@author: hichenway
+@contact: lyshello123@163.com
+@time: 2020/5/9 17:00
+@license: Apache
+pytorch 模型
+"""
+
 import torch
 from torch.nn import Module, LSTM, Linear
 from torch.utils.data import DataLoader, TensorDataset

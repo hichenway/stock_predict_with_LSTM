@@ -7,7 +7,8 @@ This project includes training and predicting processes with LSTM for stock data
 - Parameters, models and frameworks can be highly customized and modified
 - Supports incremental training
 - Support predicting multiple indicators at the same time
-- Support predicting any number of days in the future
+- Support predicting any number of days
+- Support train visualization and log record
 
 
 Chinese introduction can refer to : <https://blog.csdn.net/songyunli1111/article/details/78513811>

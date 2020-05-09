@@ -1,5 +1,12 @@
-# keras 模型
-# Author: hichenway
+# -*- coding: UTF-8 -*-
+"""
+@author: hichenway
+@contact: lyshello123@163.com
+@time: 2020/5/9 17:00
+@license: Apache
+keras 模型
+"""
+
 from keras.layers import Input, Dense, LSTM
 from keras.models import Model
 from keras.callbacks import ModelCheckpoint, EarlyStopping

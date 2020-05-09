@@ -1,5 +1,12 @@
-# tensorflow 模型
-# Author: hichenway
+# -*- coding: UTF-8 -*-
+"""
+@author: hichenway
+@contact: lyshello123@163.com
+@time: 2020/5/9 17:00
+@license: Apache
+tensorflow 模型
+"""
+
 import tensorflow as tf
 import numpy as np
 tf.logging.set_verbosity(tf.logging.ERROR)

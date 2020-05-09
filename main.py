@@ -1,4 +1,12 @@
-# Author: hichenway
+# -*- coding: UTF-8 -*-
+"""
+@author: hichenway
+@contact: lyshello123@163.com
+@time: 2020/5/9 17:00
+@license: Apache
+主程序：包括配置，数据读取，日志记录，绘图，模型训练和预测
+"""
+
 import pandas as pd
 import numpy as np
 import os
@@ -108,6 +116,7 @@ class Data:
                                     usecols=self.config.feature_columns)
         else:
             init_data = pd.read_csv(self.config.train_data_path, usecols=self.config.feature_columns)
+            init_data = init_data.iloc[::-1]
         return init_data.values, init_data.columns.tolist()     # .columns.tolist() 是获取列名
 
     def get_train_and_valid_data(self):
@@ -185,26 +194,28 @@ def load_logger(config):
     return logger
 
 def draw(config: Config, origin_data: Data, logger, predict_norm_data: np.ndarray):
-    label_norm_data = origin_data.norm_data[origin_data.train_num + origin_data.start_num_in_test : ,
+    label_data = origin_data.data[origin_data.train_num + origin_data.start_num_in_test : ,
                                             config.label_in_feature_index]
-    assert label_norm_data.shape[0]==predict_norm_data.shape[0], "The element number in origin and predicted data is different"
+    predict_data = predict_norm_data * origin_data.std[config.label_in_feature_index] + \
+                   origin_data.mean[config.label_in_feature_index]   # 通过保存的均值和方差还原数据
+    assert label_data.shape[0]==predict_data.shape[0], "The element number in origin and predicted data is different"
 
     label_name = [origin_data.data_column_name[i] for i in config.label_in_feature_index]
     label_column_num = len(config.label_columns)
 
     # label 和 predict 是错开config.predict_day天的数据的
-    loss = np.mean((label_norm_data[config.predict_day:] - predict_norm_data[:-config.predict_day] ) ** 2, axis=0)
-    logger.info("The mean squared error of stock {} is ".format(label_name) + str(loss))
+    # 下面是两种norm后的loss的计算方式，结果是一样的，可以简单手推一下
+    # label_norm_data = origin_data.norm_data[origin_data.train_num + origin_data.start_num_in_test:,
+    #              config.label_in_feature_index]
+    # loss_norm = np.mean((label_norm_data[config.predict_day:] - predict_norm_data[:-config.predict_day]) ** 2, axis=0)
+    # logger.info("The mean squared error of stock {} is ".format(label_name) + str(loss_norm))
+
+    loss = np.mean((label_data[config.predict_day:] - predict_data[:-config.predict_day] ) ** 2, axis=0)
+    loss_norm = loss/(origin_data.std[config.label_in_feature_index] ** 2)
+    logger.info("The mean squared error of stock {} is ".format(label_name) + str(loss_norm))
 
     label_X = range(origin_data.data_num - origin_data.train_num - origin_data.start_num_in_test)
     predict_X = [ x + config.predict_day for x in label_X]
-
-    # 通过保存的均值和方差还原数据
-    label_data = label_norm_data * origin_data.std[config.label_in_feature_index] + \
-                   origin_data.mean[config.label_in_feature_index]
-
-    predict_data = predict_norm_data * origin_data.std[config.label_in_feature_index] + \
-                   origin_data.mean[config.label_in_feature_index]
 
     if not sys.platform.startswith('linux'):    # 无桌面的Linux下无法输出，如果是有桌面的Linux，如Ubuntu，可去掉这一行
         for i in range(label_column_num):

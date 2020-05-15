@@ -116,7 +116,6 @@ class Data:
                                     usecols=self.config.feature_columns)
         else:
             init_data = pd.read_csv(self.config.train_data_path, usecols=self.config.feature_columns)
-            init_data = init_data.iloc[::-1]
         return init_data.values, init_data.columns.tolist()     # .columns.tolist() 是获取列名
 
     def get_train_and_valid_data(self):

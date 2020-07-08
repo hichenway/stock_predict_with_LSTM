@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 """
 @author: hichenway
+@知乎: 海晨威
 @contact: lyshello123@163.com
 @time: 2020/5/9 17:00
 @license: Apache
@@ -13,6 +14,7 @@ import os
 import sys
 import time
 import logging
+from logging.handlers import RotatingFileHandler
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
@@ -83,14 +85,15 @@ class Config:
     model_save_path = "./checkpoint/" + used_frame + "/"
     figure_save_path = "./figure/"
     log_save_path = "./log/"
-    do_log_save = True                  # 是否将config和训练过程记录到log
+    do_log_print_to_screen = True
+    do_log_save_to_file = True                  # 是否将config和训练过程记录到log
     do_figure_save = False
     do_train_visualized = False          # 训练loss可视化，pytorch用visdom，tf用tensorboardX，实际上可以通用, keras没有
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)    # makedirs 递归创建目录
     if not os.path.exists(figure_save_path):
         os.mkdir(figure_save_path)
-    if do_train and (do_log_save or do_train_visualized):
+    if do_train and (do_log_save_to_file or do_train_visualized):
         cur_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())
         log_save_path = log_save_path + cur_time + '_' + used_frame + "/"
         os.makedirs(log_save_path)
@@ -165,16 +168,17 @@ def load_logger(config):
     logger.setLevel(level=logging.DEBUG)
 
     # StreamHandler
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setLevel(level=logging.INFO)
-    formatter = logging.Formatter(datefmt='%Y/%m/%d %H:%M:%S',
-                                  fmt='[ %(asctime)s ] %(message)s')
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    if config.do_log_print_to_screen:
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setLevel(level=logging.INFO)
+        formatter = logging.Formatter(datefmt='%Y/%m/%d %H:%M:%S',
+                                      fmt='[ %(asctime)s ] %(message)s')
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
 
     # FileHandler
-    if config.do_log_save:
-        file_handler = logging.FileHandler(config.log_save_path + "out.log")
+    if config.do_log_save_to_file:
+        file_handler = RotatingFileHandler(config.log_save_path + "out.log", maxBytes=1024000, backupCount=5)
         file_handler.setLevel(level=logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(formatter)

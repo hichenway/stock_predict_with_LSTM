@@ -46,7 +46,7 @@ class Config:
     hidden_size = 128           # LSTM的隐藏层大小，也是输出大小
     lstm_layers = 2             # LSTM的堆叠层数
     dropout_rate = 0.2          # dropout概率
-    time_step = 20              # 这个参数很重要，是设置用前多少天的数据来预测，也是LSTM的time step数
+    time_step = 20              # 这个参数很重要，是设置用前多少天的数据来预测，也是LSTM的time step数，请保证训练数据量大于它
 
     # 训练参数
     do_train = True
@@ -151,12 +151,13 @@ class Data:
 
     def get_test_data(self, return_label_data=False):
         feature_data = self.norm_data[self.train_num:]
-        self.start_num_in_test = feature_data.shape[0] % self.config.time_step  # 这些天的数据不够一个time_step
-        time_step_size = feature_data.shape[0] // self.config.time_step
+        sample_interval = min(feature_data.shape[0], self.config.time_step)     # 防止time_step大于测试集数量
+        self.start_num_in_test = feature_data.shape[0] % sample_interval  # 这些天的数据不够一个sample_interval
+        time_step_size = feature_data.shape[0] // sample_interval
 
         # 在测试数据中，每time_step行数据会作为一个样本，两个样本错开time_step行
         # 比如：1-20行，21-40行。。。到数据末尾。
-        test_x = [feature_data[self.start_num_in_test+i*self.config.time_step : self.start_num_in_test+(i+1)*self.config.time_step]
+        test_x = [feature_data[self.start_num_in_test+i*sample_interval : self.start_num_in_test+(i+1)*sample_interval]
                    for i in range(time_step_size)]
         if return_label_data:       # 实际应用中的测试集是没有label数据的
             label_data = self.norm_data[self.train_num + self.start_num_in_test:, self.config.label_in_feature_index]

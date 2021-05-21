@@ -2,7 +2,7 @@ sklearn
 pandas
 argparse
 keras
-tensorflow==1.15
+tensorflow==2.5.0
 matplotlib>=3.0.2
 numpy>=1.14.6
 scipy>=1.1.0
